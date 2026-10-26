@@ -290,7 +290,39 @@ export function createMemoryHook(options = {}) {
     if (!context) return;
     if (reason && reason.kind !== 'completed') return;
 
-    let facts = extractFacts(context.query);
+    setImmediate(() => {
+      void extractAndQueue(contextKey, context).catch((error) => {
+        warnThrottled(`extract failed: ${error?.message ?? error}`);
+      });
+    });
+  }
+
+  async function extractFromService(text, source) {
+    if (disabled || circuitOpen() || !readToken()) return [];
+    try {
+      const payload = await postJson('/v1/memory/extract', {
+        text,
+        source,
+        max_facts: 2,
+      }, readTimeoutMs);
+      clearFailures();
+      const facts = Array.isArray(payload?.facts) ? payload.facts : [];
+      return facts.map((fact) => ({
+        content: cleanText(fact?.content),
+        category: cleanText(fact?.category) || 'other',
+        sensitive: fact?.sensitivity === 'sensitive',
+      })).filter((fact) => fact.content.length >= 4);
+    } catch (error) {
+      noteFailure(error);
+      return [];
+    }
+  }
+
+  async function extractAndQueue(contextKey, context) {
+    let facts = await extractFromService(context.query, context.source);
+    if (facts.length === 0) {
+      facts = extractFacts(context.query);
+    }
     if (facts.length === 0 && context.owner === true && context.remember === true) {
       const explicit = extractExplicitFact(context.query);
       if (explicit) facts = [explicit];
@@ -309,7 +341,7 @@ export function createMemoryHook(options = {}) {
       remember: context.remember === true,
     });
     saveQueues.set(contextKey, queue);
-    setImmediate(() => { void drainSaveQueue(contextKey); });
+    void drainSaveQueue(contextKey);
   }
 
   async function drainSaveQueue(key) {

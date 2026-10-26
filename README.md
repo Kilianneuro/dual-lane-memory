@@ -79,7 +79,7 @@ class MyCompressor(Compressor):
         return "..."
 ```
 
-No API key or network dependency is included in this repository. The default path stays offline.
+The hook calls `POST /v1/memory/extract` before saving; if that call fails, it falls back to the local JS regex. No API key or network dependency is included in this repository.
 
 ## Hook integration
 
@@ -101,7 +101,7 @@ const hook = createMemoryHook({
 ## Limitations
 
 - The default compressor is a **mock** (first N characters); an LLM compressor can implement the `Compressor` protocol.
-- The default extractor is regex-based; an LLM extractor can implement the `Extractor` protocol. The JS hook still carries its own regex fallback until service-side extraction is wired.
+- The default extractor is regex-based; an LLM extractor can implement the `Extractor` protocol. The JS hook calls `POST /v1/memory/extract` first and falls back to its local regex if the service is unavailable.
 - The only adapter included is QQ/SnowLuma. The schema is platform-ready, but there is no Bilibili/Discord adapter yet.
 - No dashboard, graph relations, or conflict resolution yet.
 - Built for a single owner on a local machine, not as a hosted service.

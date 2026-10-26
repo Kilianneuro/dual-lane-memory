@@ -19,6 +19,7 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from .db import ensure_token, load_config
+from .extract import Extractor, RegexExtractor
 from .store import (
     ApprovalPendingError,
     ForbiddenError,
@@ -37,7 +38,10 @@ def _json_bytes(payload: Any) -> bytes:
     return json.dumps(payload, ensure_ascii=False).encode("utf-8")
 
 
-def make_handler(store: MemoryStore, api_token: str, admin_token: str):
+def make_handler(store: MemoryStore, api_token: str, admin_token: str,
+                 extractor: Extractor | None = None):
+    chosen_extractor = extractor or RegexExtractor()
+
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
         server_version = "memory_core/1"
@@ -178,6 +182,23 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str):
                 return
 
             try:
+                if path == "/v1/memory/extract":
+                    if not self._require_api():
+                        return
+                    text = str(body.get("text") or "").strip()
+                    if len(text) < 4 or len(text) > 4000:
+                        self._error(400, "BAD_REQUEST", "text 长度必须在 4..4000 之间")
+                        return
+                    facts = chosen_extractor.extract(
+                        text, source=body.get("source"),
+                    )
+                    self._send(200, {
+                        "ok": True,
+                        "extractor": type(chosen_extractor).__name__,
+                        "facts": [fact.as_dict() for fact in facts],
+                    })
+                    return
+
                 if path == "/v1/memory/save":
                     if not self._require_api():
                         return
@@ -252,8 +273,9 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str):
 
 
 def create_server(store: MemoryStore, host: str, port: int,
-                  api_token: str, admin_token: str) -> ThreadingHTTPServer:
-    handler = make_handler(store, api_token, admin_token)
+                  api_token: str, admin_token: str,
+                  extractor: Extractor | None = None) -> ThreadingHTTPServer:
+    handler = make_handler(store, api_token, admin_token, extractor)
     server = ThreadingHTTPServer((host, port), handler)
     server.daemon_threads = True
     return server
