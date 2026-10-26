@@ -1,5 +1,7 @@
 # Dual-Lane Memory Core
 
+![test](https://github.com/Kilianneuro/dual-lane-memory/actions/workflows/test.yml/badge.svg)
+
 A local-first memory core for chat agents, built around two lifecycles rather than one flat vector store.
 
 **Status: early alpha.** The core and the QQ/SnowLuma hook are usable, but this is not a production-hardened multi-tenant service.
