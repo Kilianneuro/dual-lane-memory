@@ -1,0 +1,18 @@
+# runtime / secrets
+memory_core/config.json
+memory_core/memory.db
+memory_core/memory.db-*
+memory_core/*.db
+memory_core/api-token
+memory_core/admin-token
+state/
+config.json
+*.log
+*.bak
+*backup*
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+.DS_Store
+Thumbs.db
