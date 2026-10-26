@@ -30,6 +30,8 @@ All lifecycle actions are written to `memory_audit`.
 - **Fail-open hook**: if the memory service is down, chat continues without memory.
 - **SQLite + FTS5 only**: no vector database, no external service required.
 
+Testers: start with `TESTER_GUIDE.txt` (plain text, no Markdown rendering needed).
+
 ## Quick start
 
 Requires Python 3.10+.
