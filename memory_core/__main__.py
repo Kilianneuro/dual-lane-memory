@@ -115,6 +115,13 @@ def cmd_lifecycle(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_extract(args: argparse.Namespace) -> int:
+    from .extract import RegexExtractor
+    facts = RegexExtractor().extract(args.text)
+    _print([fact.as_dict() for fact in facts])
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="memory_core", description="Cross-conversation memory core")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -137,6 +144,9 @@ def build_parser() -> argparse.ArgumentParser:
     lifecycle = sub.add_parser("lifecycle", help="run one decay/compress/purge pass")
     lifecycle.add_argument("--dry-run", action="store_true")
     lifecycle.add_argument("--now-ms", type=int, default=None)
+
+    extract = sub.add_parser("extract", help="run the default regex extractor")
+    extract.add_argument("text")
     return parser
 
 
@@ -151,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             "approve": cmd_approve,
             "reject": cmd_reject,
             "lifecycle": cmd_lifecycle,
+            "extract": cmd_extract,
         }[args.command](args)
     except MemoryError as exc:
         print(f"[memory_core] {exc.code}: {exc}", file=sys.stderr)

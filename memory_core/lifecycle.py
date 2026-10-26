@@ -22,6 +22,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from .compress import DEFAULT_COMPRESSOR, Compressor, compress_text
 from .store import HALF_LIFE_DAYS, MemoryStore, effective_weight
 
 DAY_MS = 86_400_000
@@ -51,9 +52,8 @@ def _now_ms() -> int:
 
 
 def _mock_compress(text: str, max_chars: int) -> str:
-    """LLM placeholder: keep the first N characters."""
-    text = " ".join(str(text or "").split())
-    return text[:max(1, int(max_chars))]
+    """Default compressor: keep the first N characters."""
+    return DEFAULT_COMPRESSOR.compress(text, max_chars=max_chars, level=1)
 
 
 def _audit(store: MemoryStore, action: str, memory_id: int,
@@ -84,7 +84,8 @@ def compress_memory(store: MemoryStore, memory_id: int,
                     max_chars: int = MOCK_LEVEL1_CHARS,
                     level: int | None = None,
                     now_ms: int | None = None,
-                    force: bool = False) -> dict[str, Any]:
+                    force: bool = False,
+                    compressor: Compressor | None = None) -> dict[str, Any]:
     """Compress one memory with the mock summarizer.
 
     Pinned memories are skipped unless force=True. content is retained; only
@@ -100,7 +101,10 @@ def compress_memory(store: MemoryStore, memory_id: int,
         if row["pinned"] and not force:
             return {"ok": True, "skipped": "pinned", "memory_id": int(memory_id)}
         final_level = int(level if level is not None else row["compression_level"])
-        summary = " ".join(str(row["content"] or "").split())[:max(1, int(max_chars))]
+        summary = compress_text(
+            row["content"], max_chars=max_chars, level=final_level,
+            compressor=compressor,
+        )
         store.conn.execute(
             """
             UPDATE memories

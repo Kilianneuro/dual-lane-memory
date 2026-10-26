@@ -159,6 +159,18 @@ class LifecycleTest(unittest.TestCase):
         self.assertEqual(row["compression_level"], 1)
         self.assertEqual(row["content"], "这是需要被压缩成摘要的一段很长的内容。" * 10)
 
+    def test_compress_memory_accepts_custom_compressor(self) -> None:
+        result = self._save("需要自定义压缩的内容。" * 5, self.video)
+        class UpperCompressor:
+            def compress(self, text: str, *, max_chars: int = 50, level: int = 1) -> str:
+                return str(text).upper()[:max_chars]
+        compressed = compress_memory(
+            self.store, result["memory_id"], max_chars=20,
+            compressor=UpperCompressor(), now_ms=BASE,
+        )
+        self.assertTrue(compressed["summary"].startswith("需要自定义压缩"))
+        self.assertEqual(len(compressed["summary"]), 20)
+
     def test_search_limit_and_text_budget(self) -> None:
         for i in range(10):
             self.store.save(

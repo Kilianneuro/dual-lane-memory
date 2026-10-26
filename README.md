@@ -50,6 +50,7 @@ The service listens on `127.0.0.1:9881` by default. Tokens are generated in `mem
 ```powershell
 python -m memory_core stats
 python -m memory_core pending
+python -m memory_core extract "我现在在玩只狼，卡在苇名弦一郎"
 ```
 
 ## Run tests
@@ -57,6 +58,28 @@ python -m memory_core pending
 ```powershell
 python -m unittest discover -s memory_core/tests
 ```
+
+## Extension points
+
+The two places where a model would be plugged in are isolated behind protocols:
+
+- `memory_core/extract.py` — `Extractor` protocol; `RegexExtractor` is the dependency-free default. A future `LLMExtractor` only needs to return `ExtractedFact` objects.
+- `memory_core/compress.py` — `Compressor` protocol; `MockCompressor` keeps the first N characters. `lifecycle.compress_memory()` already accepts a custom compressor.
+
+```python
+from memory_core.extract import Extractor, ExtractedFact
+from memory_core.compress import Compressor
+
+class MyExtractor(Extractor):
+    def extract(self, text, *, source=None):
+        return [ExtractedFact(content="...", category="experience")]
+
+class MyCompressor(Compressor):
+    def compress(self, text, *, max_chars=50, level=1):
+        return "..."
+```
+
+No API key or network dependency is included in this repository. The default path stays offline.
 
 ## Hook integration
 
@@ -77,8 +100,8 @@ const hook = createMemoryHook({
 
 ## Limitations
 
-- Compression is currently a **mock** (first N characters). It is intentionally isolated so a real summarizer can replace it.
-- Automatic fact extraction in the hook is regex-based, not an LLM extractor.
+- The default compressor is a **mock** (first N characters); an LLM compressor can implement the `Compressor` protocol.
+- The default extractor is regex-based; an LLM extractor can implement the `Extractor` protocol. The JS hook still carries its own regex fallback until service-side extraction is wired.
 - The only adapter included is QQ/SnowLuma. The schema is platform-ready, but there is no Bilibili/Discord adapter yet.
 - No dashboard, graph relations, or conflict resolution yet.
 - Built for a single owner on a local machine, not as a hosted service.
