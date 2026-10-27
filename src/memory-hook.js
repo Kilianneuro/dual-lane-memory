@@ -283,6 +283,24 @@ export function createMemoryHook(options = {}) {
     }
   }
 
+  async function observe(key, messages, source) {
+    if (disabled || circuitOpen() || !readToken()) return null;
+    const safeSource = sanitizeSource(source);
+    if (!safeSource || !Array.isArray(messages) || messages.length === 0) return null;
+    try {
+      const result = await postJson('/v1/memory/observe', {
+        source: safeSource,
+        messages,
+      }, saveTimeoutMs);
+      clearFailures();
+      log(`[memory-hook] observe key=${key} messages=${messages.length} ids=${(result?.memory_ids || []).length}`);
+      return result;
+    } catch (error) {
+      noteFailure(error);
+      return null;
+    }
+  }
+
   function onTurnEnd({ key, assistantText, reason } = {}) {
     const contextKey = String(key ?? '');
     const context = contexts.get(contextKey);
@@ -405,6 +423,7 @@ export function createMemoryHook(options = {}) {
   return {
     prefetch,
     attach,
+    observe,
     onTurnEnd,
     extractFacts,
     extractExplicitFact,
