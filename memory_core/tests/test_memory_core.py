@@ -243,5 +243,23 @@ class MemoryCoreTest(unittest.TestCase):
         self.assertEqual(result["results"][0]["category"], "experience")
 
 
+    def test_owner_private_reads_all_scopes(self) -> None:
+        store = MemoryStore(":memory:", owner_id="10001", owner_read_all=True)
+        try:
+            source = {"platform": "qq", "context_type": "group", "context_id": "3001"}
+            owner_source = {"platform": "qq", "context_type": "private", "context_id": "10001"}
+            other_group = {"platform": "qq", "context_type": "group", "context_id": "3002"}
+            store.save({
+                "content": "只在原群可见的记忆。",
+                "category": "preference",
+                "context_scope": "share_same_platform",
+                "visibility": "origin",
+                "source": source,
+            })
+            self.assertEqual(store.search("原群可见", owner_source)["count"], 1)
+            self.assertEqual(store.search("原群可见", other_group)["count"], 0)
+        finally:
+            store.close()
+
 if __name__ == "__main__":
     unittest.main()

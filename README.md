@@ -24,6 +24,7 @@ All lifecycle actions are written to `memory_audit`.
 ## Other properties
 
 - **Scope-aware retrieval**: `share_all`, `share_same_platform`, `share_owner_only`; visibility is `global`, `origin`, or `private`.
+- **Owner-private read-all (optional)**: with `owner_read_all: true`, the owner's private chat can read all approved memories; groups keep their normal scope filters.
 - **Sensitive approval**: sensitive/secret memories are withheld from retrieval until the owner approves them.
 - **Budgeted injection**: at most 8 results and ~1200 characters per search.
 - **Precision + relaxed recall**: FTS5 bigram AND first; if empty, OR fallback with BM25 ranking.

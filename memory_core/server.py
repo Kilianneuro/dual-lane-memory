@@ -285,7 +285,8 @@ def serve(config: dict[str, Any] | None = None) -> None:
     cfg = config or load_config()
     api_token = ensure_token(cfg["api_token_file"])
     admin_token = ensure_token(cfg["admin_token_file"])
-    store = MemoryStore(cfg["db_path"], owner_id=cfg.get("owner_id", ""))
+    store = MemoryStore(cfg["db_path"], owner_id=cfg.get("owner_id", ""),
+                owner_read_all=bool(cfg.get("owner_read_all", True)))
     server = create_server(store, cfg["host"], cfg["port"], api_token, admin_token)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")

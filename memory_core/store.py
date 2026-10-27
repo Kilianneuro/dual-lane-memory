@@ -129,10 +129,11 @@ def _locked(method):
 
 
 class MemoryStore:
-    def __init__(self, db_path: str, owner_id: str = ""):
+    def __init__(self, db_path: str, owner_id: str = "", owner_read_all: bool = False):
         self.db = MemoryDB(db_path)
         self.conn = self.db.conn
         self.owner_id = str(owner_id or "").strip()
+        self.owner_read_all = bool(owner_read_all)
         self.lock = threading.RLock()
 
     def close(self) -> None:
@@ -828,6 +829,11 @@ class MemoryStore:
     # Search
     # ------------------------------------------------------------------
     def _visibility_clause(self, source: dict[str, str], alias: str = "m") -> tuple[str, list[Any]]:
+        # Explicit owner-private read-all mode: groups keep their normal filters.
+        if (self.owner_read_all and self.owner_id
+                and source.get("context_type") == "private"
+                and source.get("context_id") == self.owner_id):
+            return "1 = 1", []
         sql = f"""(
           (
             {alias}.visibility = 'global'

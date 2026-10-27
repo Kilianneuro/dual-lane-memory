@@ -17,6 +17,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "host": "127.0.0.1",
     "port": 9881,
     "db_path": "memory.db",
+    "owner_read_all": True,
     "owner_id": "",
     "api_token_file": "api-token",
     "admin_token_file": "admin-token",
