@@ -29,6 +29,16 @@ class SelfModelTest(unittest.TestCase):
         self.assertEqual(self.service.current()["version"], 2)
         self.assertEqual(self.service.current()["traits"]["嘴硬心软"], 0.9)
 
+    def test_partial_update_keeps_omitted_fields(self) -> None:
+        self.service._apply_version(
+            {"traits": {"嘴硬心软": 0.8}, "values": ["不装客服"], "tone": {}, "relationships": {}},
+            [], 1.0, "seed values", 1_760_000_000_001,
+        )
+        self.service.submit({"traits": {"嘴硬心软": 0.9}}, reason="small drift")
+        current = self.service.current()
+        self.assertEqual(current["traits"]["嘴硬心软"], 0.9)
+        self.assertEqual(current["values"], ["不装客服"])
+
     def test_major_trait_change_needs_owner(self) -> None:
         result = self.service.submit(
             {"traits": {"嘴硬心软": 0.4}, "values": [], "tone": {}, "relationships": {}},

@@ -113,14 +113,30 @@ class SelfModelService:
     def submit(self, proposed: Any, *, evidence_ids: list[int] | None = None,
                owner_weight: float = 1.0, reason: str = "") -> dict[str, Any]:
         current = self.current()
-        clean = _normalize(proposed)
-        changes, severity = diff_states(current, clean)
+        normalized = _normalize(proposed)
+        # Reflection may return only the fields it wants to change. Merge them
+        # over the current overlay so omitted fields are preserved.
+        merged = {
+            "traits": dict(current.get("traits") or {}),
+            "values": list(current.get("values") or []),
+            "tone": dict(current.get("tone") or {}),
+            "relationships": dict(current.get("relationships") or {}),
+        }
+        if "traits" in proposed:
+            merged["traits"] = {**merged["traits"], **normalized["traits"]}
+        if "values" in proposed:
+            merged["values"] = normalized["values"]
+        if "tone" in proposed:
+            merged["tone"] = normalized["tone"]
+        if "relationships" in proposed:
+            merged["relationships"] = normalized["relationships"]
+        changes, severity = diff_states(current, merged)
         if not changes:
             return {"ok": True, "changed": False, "version": current.get("version", 0),
                     "severity": severity, "changes": []}
         now = _now()
         if severity == "minor":
-            applied = self._apply_version(clean, evidence_ids or [], owner_weight, reason, now)
+            applied = self._apply_version(merged, evidence_ids or [], owner_weight, reason, now)
             return {"ok": True, "changed": True, "applied": True,
                     "version": applied, "severity": severity, "changes": changes}
         with self.store.lock, self.store.conn:
@@ -130,7 +146,7 @@ class SelfModelService:
                     severity, reason, status, created_at)
                    VALUES (?,?,?,?,?,?,?, 'pending', ?)""",
                 (int(current.get("version") or 0),
-                 json.dumps(clean, ensure_ascii=False),
+                 json.dumps(merged, ensure_ascii=False),
                  json.dumps(changes, ensure_ascii=False),
                  json.dumps(evidence_ids or [], ensure_ascii=False),
                  float(owner_weight), severity, reason[:500], now),

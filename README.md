@@ -126,6 +126,8 @@ POST /v1/persona/proposals/{id}/decide
 
 This keeps the base character stable while allowing bounded, auditable growth.
 
+When five episodes have accumulated, the bridge can run a dedicated read-only DSH reflection turn, parse its JSON proposal, and submit it through the same endpoint. The reflection session is separate from QQ chats and uses the `qq-agent-readonly` preset; failures are logged and ignored.
+
 ## Hook integration
 
 `src/memory-hook.js` is a non-invasive adapter. It expects a running memory service and a token file:

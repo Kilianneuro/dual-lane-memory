@@ -953,7 +953,8 @@ class MemoryStore:
                 (now, window_id),
             )
             return {"ok": True, "duplicate": False, "window_id": window_id,
-                    "memory_ids": memory_ids, "topic_count": len(topics)}
+                    "memory_ids": memory_ids, "topic_count": len(topics),
+                    "episode": episode}
 
     # ------------------------------------------------------------------
     # Search

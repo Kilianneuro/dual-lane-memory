@@ -301,6 +301,24 @@ export function createMemoryHook(options = {}) {
     }
   }
 
+  async function reflect(state, evidenceIds = [], ownerWeight = 1.0, reason = '') {
+    if (disabled || circuitOpen() || !readToken()) return null;
+    try {
+      const result = await postJson('/v1/persona/reflect', {
+        state,
+        evidence_ids: evidenceIds,
+        owner_weight: ownerWeight,
+        reason,
+      }, saveTimeoutMs);
+      clearFailures();
+      log(`[memory-hook] reflect changed=${result?.changed} severity=${result?.severity}`);
+      return result;
+    } catch (error) {
+      noteFailure(error);
+      return null;
+    }
+  }
+
   function onTurnEnd({ key, assistantText, reason } = {}) {
     const contextKey = String(key ?? '');
     const context = contexts.get(contextKey);
@@ -424,6 +442,7 @@ export function createMemoryHook(options = {}) {
     prefetch,
     attach,
     observe,
+    reflect,
     onTurnEnd,
     extractFacts,
     extractExplicitFact,
