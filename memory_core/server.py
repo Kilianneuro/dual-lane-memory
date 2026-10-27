@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, urlparse
 from .db import ensure_token, load_config
 from .extract import Extractor, RegexExtractor
 from .observer import MockObserver, Observer
+from .self_model import SelfModelService
 from .store import (
     ApprovalPendingError,
     ForbiddenError,
@@ -33,6 +34,7 @@ log = logging.getLogger("memory_core.http")
 
 _APPROVAL_DECIDE_RE = re.compile(r"^/v1/memory/approvals/(\d+)/decide$")
 _MEMORY_GET_RE = re.compile(r"^/v1/memory/(\d+)$")
+_SELF_MODEL_DECIDE_RE = re.compile(r"^/v1/persona/proposals/(\d+)/decide$")
 
 
 def _json_bytes(payload: Any) -> bytes:
@@ -44,6 +46,7 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
                  observer: Observer | None = None):
     chosen_extractor = extractor or RegexExtractor()
     chosen_observer = observer or MockObserver()
+    self_model = SelfModelService(store)
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -118,6 +121,29 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
                 self._send(200, {"ok": True, "service": "memory_core", "version": "1"})
                 return
 
+            if path == "/v1/persona/self":
+                if not self._require_api():
+                    return
+                try:
+                    self._send(200, {
+                        "ok": True,
+                        "self_model": self_model.current(),
+                        "pending_proposals": len(self_model.list_proposals("pending")),
+                    })
+                except Exception as exc:  # noqa: BLE001
+                    self._handle_exception(exc)
+                return
+
+            if path == "/v1/persona/proposals":
+                if not self._require_admin():
+                    return
+                try:
+                    status = (parse_qs(parsed.query).get("status") or ["pending"])[0]
+                    self._send(200, {"ok": True, "items": self_model.list_proposals(status)})
+                except Exception as exc:  # noqa: BLE001
+                    self._handle_exception(exc)
+                return
+
             if path == "/v1/memory/stats":
                 if not self._require_api():
                     return
@@ -185,6 +211,37 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
                 return
 
             try:
+                if path == "/v1/persona/reflect":
+                    if not self._require_api():
+                        return
+                    proposed = body.get("state")
+                    result = self_model.submit(
+                        proposed,
+                        evidence_ids=body.get("evidence_ids") or [],
+                        owner_weight=float(body.get("owner_weight") or 1.0),
+                        reason=str(body.get("reason") or ""),
+                    )
+                    self._send(200, result)
+                    return
+
+                if path == "/v1/persona/proposals":
+                    if not self._require_admin():
+                        return
+                    self._send(200, {"ok": True, "items": self_model.list_proposals("pending")})
+                    return
+
+                persona_decide = _SELF_MODEL_DECIDE_RE.match(path)
+                if persona_decide:
+                    if not self._require_admin():
+                        return
+                    result = self_model.decide(
+                        int(persona_decide.group(1)),
+                        str(body.get("decision") or ""),
+                        decided_by=str(body.get("decided_by") or "owner"),
+                    )
+                    self._send(200, result)
+                    return
+
                 if path == "/v1/memory/observe":
                     if not self._require_api():
                         return

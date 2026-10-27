@@ -106,6 +106,26 @@ The window is hashed and deduplicated in `observation_windows`; raw messages are
 
 Episodes default to `origin`: the source group and the owner's private chat (via `owner_read_all`) can see them; other groups cannot.
 
+## Self-model (Phase B)
+
+The base role card (`roles/*.md`) is read-only to the memory service. The AI keeps a separate self-model overlay in `self_model_versions`:
+
+- traits can drift by at most `±0.2` without owner intervention;
+- changes to values, tone, relationships, or larger trait jumps create a pending proposal;
+- `guardrails`, `safety`, `tools`, and `role_card` are rejected outright;
+- the owner can approve or reject proposals.
+
+The service does not call a model by itself. A model-produced JSON proposal is submitted to:
+
+```text
+POST /v1/persona/reflect
+GET  /v1/persona/self
+GET  /v1/persona/proposals?status=pending
+POST /v1/persona/proposals/{id}/decide
+```
+
+This keeps the base character stable while allowing bounded, auditable growth.
+
 ## Hook integration
 
 `src/memory-hook.js` is a non-invasive adapter. It expects a running memory service and a token file:
