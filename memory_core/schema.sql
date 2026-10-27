@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS schema_meta (
   value TEXT NOT NULL
 );
 
-INSERT INTO schema_meta(key, value) VALUES ('schema_version', '2')
+INSERT INTO schema_meta(key, value) VALUES ('schema_version', '3')
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 
 INSERT INTO schema_meta(key, value)
@@ -49,6 +49,7 @@ INSERT OR REPLACE INTO memory_category_defaults(category, half_life_days, descri
   ('task',            14, 'short-lived tasks and reminders',       CAST(strftime('%s', 'now') AS INTEGER) * 1000),
   ('opinion',         60, 'opinions and attitudes',                CAST(strftime('%s', 'now') AS INTEGER) * 1000),
   ('event',           30, 'events and happenings',                 CAST(strftime('%s', 'now') AS INTEGER) * 1000),
+  ('episode',         30, 'rolling group conversation summaries',    CAST(strftime('%s', 'now') AS INTEGER) * 1000),
   ('gossip',          14, 'low-value chatter',                     CAST(strftime('%s', 'now') AS INTEGER) * 1000),
   ('emotion',         14, 'emotional states, fast decay',          CAST(strftime('%s', 'now') AS INTEGER) * 1000),
   ('experience',      90, 'personal experiences and stories',      CAST(strftime('%s', 'now') AS INTEGER) * 1000),
@@ -455,5 +456,38 @@ CREATE INDEX IF NOT EXISTS idx_relations_to
 
 CREATE INDEX IF NOT EXISTS idx_audit_time
   ON memory_audit(created_at DESC);
+
+
+-- ---------------------------------------------------------------------------
+-- 10. Observation windows and self-model versions (phase A)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS observation_windows (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  platform       TEXT NOT NULL,
+  context_type   TEXT NOT NULL,
+  context_id     TEXT NOT NULL,
+  start_seq      INTEGER,
+  end_seq        INTEGER,
+  message_count  INTEGER NOT NULL,
+  content_hash   TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'pending',
+  created_at     INTEGER NOT NULL,
+  processed_at   INTEGER,
+  UNIQUE(platform, context_type, context_id, content_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_observation_windows_context
+  ON observation_windows(platform, context_type, context_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS self_model_versions (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  version         INTEGER NOT NULL UNIQUE,
+  state_json      TEXT NOT NULL,
+  evidence_ids    TEXT,
+  owner_weight    REAL NOT NULL DEFAULT 1.0,
+  reason          TEXT,
+  status          TEXT NOT NULL DEFAULT 'active',
+  created_at      INTEGER NOT NULL
+);
 
 COMMIT;

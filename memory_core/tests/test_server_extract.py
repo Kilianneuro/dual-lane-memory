@@ -45,6 +45,18 @@ class ExtractEndpointTest(unittest.TestCase):
         self.assertEqual(data["facts"][0]["category"], "game_progress")
         self.assertIn("只狼", data["facts"][0]["content"])
 
+    def test_observe_endpoint(self) -> None:
+        status, data = self._post("/v1/memory/observe", {
+            "source": {"platform": "qq", "context_type": "group", "context_id": "1001"},
+            "messages": [
+                {"seq": 1, "user_id": "10002", "text": "今晚聊只狼和炉石"},
+                {"seq": 2, "user_id": "10003", "text": "只狼太难了"},
+            ],
+        })
+        self.assertEqual(status, 200)
+        self.assertTrue(data["ok"])
+        self.assertGreaterEqual(len(data["memory_ids"]), 1)
+
     def test_extract_requires_auth(self) -> None:
         status, _ = self._post("/v1/memory/extract", {"text": "我喜欢吃火锅"}, token="wrong")
         self.assertEqual(status, 401)

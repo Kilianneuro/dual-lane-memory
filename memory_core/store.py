@@ -24,6 +24,7 @@ from functools import wraps
 from typing import Any
 
 from .db import MemoryDB
+from .extract import SENSITIVE_RE
 from .text import make_fts_query, make_search_text, normalize_key, normalize_tag
 
 CATEGORY_PRIOR = {
@@ -34,6 +35,7 @@ CATEGORY_PRIOR = {
     "task": 0.55,
     "opinion": 0.50,
     "event": 0.45,
+    "episode": 0.45,
     "gossip": 0.25,
     "emotion": 0.55,
     "experience": 0.60,
@@ -50,6 +52,7 @@ HALF_LIFE_DAYS = {
     "promise": 90,
     "opinion": 60,
     "event": 30,
+    "episode": 30,
     "task": 14,
     "gossip": 14,
     "emotion": 14,
@@ -824,6 +827,133 @@ class MemoryStore:
                 "weight": round(float(touched["weight"]), 6),
                 "mention_count": int(touched["mention_count"]),
             }
+
+    # ------------------------------------------------------------------
+    # Observation windows -> episode / opinion / emotion
+    # ------------------------------------------------------------------
+    @_locked
+    def record_observation(self, source: Any, messages: list[dict[str, Any]],
+                           observation: Any, *, start_seq: int | None = None,
+                           end_seq: int | None = None, observer: str = "mock",
+                           now_ms: int | None = None) -> dict[str, Any]:
+        """Persist one summarized observation window.
+
+        Raw messages are hashed, not stored. The window is idempotent: the same
+        source + content hash returns the existing window without duplicating
+        memories.
+        """
+        src = self._validate_source(source)
+        if not isinstance(messages, list) or not messages:
+            raise MemoryError("messages 不能为空")
+        if len(messages) > 100:
+            raise MemoryError("messages 最多 100 条")
+        now = int(now_ms) if now_ms is not None else _now_ms()
+        normalized: list[dict[str, Any]] = []
+        for message in messages:
+            text = str(message.get("text") or "").strip()[:1000]
+            if not text:
+                continue
+            item = {
+                "seq": message.get("seq"),
+                "user_id": str(message.get("user_id") or ""),
+                "text": text,
+                "is_self": bool(message.get("is_self")),
+            }
+            normalized.append(item)
+        if not normalized:
+            raise MemoryError("messages 没有有效文本")
+        digest = hashlib.sha256(json.dumps(
+            normalized, ensure_ascii=False, sort_keys=True,
+        ).encode("utf-8")).hexdigest()
+        seqs = [int(m["seq"]) for m in normalized if str(m.get("seq") or "").isdigit()]
+        start = int(start_seq) if start_seq is not None else (min(seqs) if seqs else None)
+        end = int(end_seq) if end_seq is not None else (max(seqs) if seqs else None)
+
+        with self.lock, self.conn:
+            existing = self.conn.execute(
+                """SELECT id FROM observation_windows
+                    WHERE platform=? AND context_type=? AND context_id=? AND content_hash=?""",
+                (src["platform"], src["context_type"], src["context_id"], digest),
+            ).fetchone()
+            if existing:
+                return {"ok": True, "duplicate": True, "window_id": int(existing["id"]),
+                        "memory_ids": []}
+            cur = self.conn.execute(
+                """INSERT INTO observation_windows
+                   (platform, context_type, context_id, start_seq, end_seq,
+                    message_count, content_hash, status, created_at)
+                   VALUES (?,?,?,?,?,?,?,?,?)""",
+                (src["platform"], src["context_type"], src["context_id"], start, end,
+                 len(normalized), digest, "pending", now),
+            )
+            window_id = int(cur.lastrowid)
+            data = observation.as_dict() if hasattr(observation, "as_dict") else dict(observation or {})
+            episode = str(data.get("episode") or "").strip()[:300]
+            topics = [str(t)[:40] for t in (data.get("topics") or [])][:8]
+            memory_ids: list[int] = []
+            if episode:
+                ep = self.save({
+                    "content": episode,
+                    "category": "episode",
+                    "context_scope": "share_same_platform",
+                    "visibility": "origin",
+                    "sensitivity": "sensitive" if SENSITIVE_RE.search(episode) else "normal",
+                    "importance": 0.5,
+                    "confidence": 0.65,
+                    "tags": ["episode", "observer", observer],
+                    "subject": "群聊片段",
+                    "subject_key": f"window:{window_id}",
+                    "predicate": "episode",
+                    "object": episode[:120],
+                    "meta": {"window_id": window_id, "topics": topics,
+                             "observer": observer, "start_seq": start, "end_seq": end},
+                    "source": src,
+                }, now_ms=now)
+                if ep.get("memory_id"):
+                    memory_ids.append(int(ep["memory_id"]))
+            impressions = data.get("impressions") or []
+            if isinstance(impressions, list):
+                for imp in impressions[:3]:
+                    if not isinstance(imp, dict):
+                        continue
+                    about = str(imp.get("about") or "").strip()[:80]
+                    stance = str(imp.get("stance") or "").strip()[:200]
+                    emotion = str(imp.get("emotion") or "").strip()[:80]
+                    if stance:
+                        content = f"对{about}的看法：{stance}" if about else stance
+                        category = "opinion"
+                    elif emotion:
+                        content = f"对{about}的情绪：{emotion}" if about else emotion
+                        category = "emotion"
+                    else:
+                        continue
+                    saved = self.save({
+                        "content": content,
+                        "category": category,
+                        "context_scope": "share_same_platform",
+                        "visibility": "origin",
+                        "sensitivity": "sensitive" if SENSITIVE_RE.search(content) else "normal",
+                        "importance": min(0.9, max(0.4, float(imp.get("intensity") or 0.5))),
+                        "confidence": min(1.0, max(0.0, float(imp.get("confidence") or 0.5))),
+                        "tags": ["observer", observer, category],
+                        "subject": about or None,
+                        "subject_key": normalize_key(f"about:{about}") or None,
+                        "predicate": "stance" if category == "opinion" else "emotion",
+                        "object": stance or emotion,
+                        "meta": {"window_id": window_id, "about": about,
+                                 "intensity": imp.get("intensity"),
+                                 "valence": imp.get("valence"),
+                                 "confidence": imp.get("confidence")},
+                        "source": src,
+                    }, now_ms=now)
+                    if saved.get("memory_id"):
+                        memory_ids.append(int(saved["memory_id"]))
+            self.conn.execute(
+                "UPDATE observation_windows SET status='processed', processed_at=? WHERE id=?",
+                (now, window_id),
+            )
+            return {"ok": True, "duplicate": False, "window_id": window_id,
+                    "memory_ids": memory_ids, "topic_count": len(topics)}
 
     # ------------------------------------------------------------------
     # Search

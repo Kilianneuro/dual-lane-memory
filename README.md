@@ -84,6 +84,28 @@ class MyCompressor(Compressor):
 
 The hook calls `POST /v1/memory/extract` before saving; if that call fails, it falls back to the local JS regex. No API key or network dependency is included in this repository.
 
+## Group observation (Phase A)
+
+`POST /v1/memory/observe` accepts a message window and turns it into lifecycle-managed memories:
+
+- `episode` — rolling summary of the window (30-day half-life)
+- `opinion` — the agent's stated stance toward a topic/person (60-day half-life)
+- `emotion` — a short-lived emotional impression (14-day half-life)
+
+The window is hashed and deduplicated in `observation_windows`; raw messages are not stored. The default `MockObserver` is offline and only extracts keywords. `self_model_versions` exists for Phase B reflection; no self-modifying persona is active yet.
+
+```json
+{
+  "source": {"platform": "qq", "context_type": "group", "context_id": "1001"},
+  "messages": [
+    {"seq": 1, "user_id": "10002", "text": "今晚聊只狼和炉石"},
+    {"seq": 2, "user_id": "10003", "text": "只狼太难了"}
+  ]
+}
+```
+
+Episodes default to `origin`: the source group and the owner's private chat (via `owner_read_all`) can see them; other groups cannot.
+
 ## Hook integration
 
 `src/memory-hook.js` is a non-invasive adapter. It expects a running memory service and a token file:
