@@ -1,4 +1,4 @@
-Dual-Lane Memory Core 0.1.0-alpha 测试说明
+﻿Dual-Lane Memory Core 0.1.0-alpha 测试说明
 ================================================
 
 这个包只测 Python 记忆核心。
@@ -28,7 +28,7 @@ PowerShell 里运行：
 
 正常结果应包含：
 
-  Ran 28 tests
+  Ran 39 tests
   OK
 
 四、初始化
