@@ -57,12 +57,6 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
         def log_message(self, fmt: str, *args: Any) -> None:
             log.info("%s - %s", self.address_string(), fmt % args)
 
-        def handle_error(self, request, client_address) -> None:
-            exc = sys.exc_info()[1]
-            if isinstance(exc, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
-                return
-            super().handle_error(request, client_address)
-
         def _send(self, status: int, payload: Any) -> None:
             body = _json_bytes(payload)
             self.send_response(status)
@@ -89,6 +83,17 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
             if length <= 0:
                 return {}
             if length > 1_000_000:
+                # Drain (a bounded amount of) the body before closing, otherwise
+                # Windows may send RST and the client cannot read the 413 JSON.
+                remaining = min(length, 8 * 1024 * 1024)
+                try:
+                    while remaining > 0:
+                        chunk = self.rfile.read(min(65536, remaining))
+                        if not chunk:
+                            break
+                        remaining -= len(chunk)
+                except OSError:
+                    pass
                 self.close_connection = True
                 raise MemoryError("请求体过大（上限 1MB）", "PAYLOAD_TOO_LARGE", 413)
             raw = self.rfile.read(length)
@@ -362,12 +367,22 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
     return Handler
 
 
+class QuietHTTPServer(ThreadingHTTPServer):
+    """ThreadingHTTPServer that does not log client-disconnect tracebacks."""
+
+    def handle_error(self, request, client_address) -> None:
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
+
+
 def create_server(store: MemoryStore, host: str, port: int,
                   api_token: str, admin_token: str,
                   extractor: Extractor | None = None,
                   observer: Observer | None = None) -> ThreadingHTTPServer:
     handler = make_handler(store, api_token, admin_token, extractor, observer)
-    server = ThreadingHTTPServer((host, port), handler)
+    server = QuietHTTPServer((host, port), handler)
     server.daemon_threads = True
     return server
 

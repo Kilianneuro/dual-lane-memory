@@ -57,6 +57,22 @@ class ExtractEndpointTest(unittest.TestCase):
         self.assertTrue(data["ok"])
         self.assertGreaterEqual(len(data["memory_ids"]), 1)
 
+    def test_oversize_body_returns_413_and_readable_response(self) -> None:
+        payload = json.dumps({"content": "x" * 1_100_000})
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=10)
+        try:
+            conn.request("POST", "/v1/memory/save", payload, {
+                "Content-Type": "application/json",
+                "X-Memory-Token": "api-token",
+            })
+            resp = conn.getresponse()
+            body = json.loads(resp.read().decode("utf-8"))
+            self.assertEqual(resp.status, 413)
+            self.assertEqual(resp.getheader("Connection"), "close")
+            self.assertEqual(body["error"]["code"], "PAYLOAD_TOO_LARGE")
+        finally:
+            conn.close()
+
     def test_extract_requires_auth(self) -> None:
         status, _ = self._post("/v1/memory/extract", {"text": "我喜欢吃火锅"}, token="wrong")
         self.assertEqual(status, 401)
