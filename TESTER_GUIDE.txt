@@ -28,7 +28,7 @@ PowerShell 里运行：
 
 正常结果应包含：
 
-  Ran 39 tests
+  Ran 42 tests
   OK
 
 四、初始化
