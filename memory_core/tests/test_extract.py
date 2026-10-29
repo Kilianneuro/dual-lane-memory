@@ -29,6 +29,17 @@ class ExtractTest(unittest.TestCase):
         self.assertEqual(facts[0]["category"], "preference")
         self.assertEqual(facts[0]["content"], "用户喜欢吃火锅")
 
+    def test_sensitive_phone_fallback(self) -> None:
+        facts = self.extractor.extract("我的手机号是 13800138000")
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(facts[0].sensitivity, "sensitive")
+        self.assertIn("13800138000", facts[0].content)
+
+    def test_sensitive_id_fallback(self) -> None:
+        facts = self.extractor.extract("我的身份证号是 440101199001011234")
+        self.assertEqual(len(facts), 1)
+        self.assertEqual(facts[0].sensitivity, "sensitive")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -34,6 +34,12 @@ def cmd_init(_args: argparse.Namespace) -> int:
             encoding="utf-8",
         )
     cfg = load_config()
+    if not cfg.get("owner_id"):
+        print(
+            "[memory_core] WARNING: owner_id 为空；private 记忆和 owner_read_all 将无法生效。"
+            " 请在 memory_core/config.json 填入主人 ID。",
+            file=sys.stderr,
+        )
     ensure_token(cfg["api_token_file"])
     ensure_token(cfg["admin_token_file"])
     store = MemoryStore(cfg["db_path"], owner_id=cfg.get("owner_id", ""))

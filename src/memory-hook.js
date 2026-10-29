@@ -125,6 +125,13 @@ function extractFacts(userText) {
     });
     if (facts.length >= 2) break;
   }
+  if (facts.length === 0 && SENSITIVE_RE.test(text)) {
+    let content = text.slice(0, 300);
+    if (content.startsWith('我')) content = `用户${content.slice(1)}`;
+    if (content.length >= 4) {
+      facts.push({ category: 'identity', content, sensitive: true });
+    }
+  }
   return facts;
 }
 

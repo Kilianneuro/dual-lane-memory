@@ -42,7 +42,7 @@ cd dual-lane-memory
 python -m memory_core init
 ```
 
-Edit `memory_core/config.json` and set `owner_id` to your own stable owner ID. Then:
+Edit `memory_core/config.json` and set `owner_id` to your own stable owner ID. This is required for `private` memories and `owner_read_all`; an empty owner ID emits a warning and makes private memories unsearchable. Then:
 
 ```powershell
 python -m memory_core serve
@@ -55,6 +55,8 @@ python -m memory_core stats
 python -m memory_core pending
 python -m memory_core extract "我现在在玩只狼，卡在苇名弦一郎"
 ```
+
+`extract` is a dry-run preview: it prints facts but does not write them to the database. Use `POST /v1/memory/save` to persist.
 
 ## Run tests
 

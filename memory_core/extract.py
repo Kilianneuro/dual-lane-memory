@@ -78,6 +78,16 @@ class RegexExtractor:
             ))
             if len(facts) >= self.max_facts:
                 break
+        if not facts and SENSITIVE_RE.search(value):
+            content = value[:300]
+            if content.startswith("我"):
+                content = "用户" + content[1:]
+            facts.append(ExtractedFact(
+                content=content,
+                category="identity",
+                sensitivity="sensitive",
+                confidence=0.7,
+            ))
         return facts
 
 

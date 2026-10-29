@@ -14,6 +14,7 @@ import json
 import logging
 import re
 import sqlite3
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -56,12 +57,20 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
         def log_message(self, fmt: str, *args: Any) -> None:
             log.info("%s - %s", self.address_string(), fmt % args)
 
+        def handle_error(self, request, client_address) -> None:
+            exc = sys.exc_info()[1]
+            if isinstance(exc, (ConnectionResetError, BrokenPipeError, ConnectionAbortedError)):
+                return
+            super().handle_error(request, client_address)
+
         def _send(self, status: int, payload: Any) -> None:
             body = _json_bytes(payload)
             self.send_response(status)
             self.send_header("Content-Type", "application/json; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
+            if self.close_connection:
+                self.send_header("Connection", "close")
             self.end_headers()
             try:
                 self.wfile.write(body)
@@ -80,6 +89,7 @@ def make_handler(store: MemoryStore, api_token: str, admin_token: str,
             if length <= 0:
                 return {}
             if length > 1_000_000:
+                self.close_connection = True
                 raise MemoryError("请求体过大（上限 1MB）", "PAYLOAD_TOO_LARGE", 413)
             raw = self.rfile.read(length)
             try:

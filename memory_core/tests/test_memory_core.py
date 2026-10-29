@@ -261,5 +261,11 @@ class MemoryCoreTest(unittest.TestCase):
         finally:
             store.close()
 
+    def test_like_wildcards_are_literal(self) -> None:
+        self._save("这是一条普通记忆，不含通配符。", self.group_a)
+        self.assertEqual(self.store.search("%", self.group_a)["count"], 0)
+        self.assertEqual(self.store.search("_", self.group_a)["count"], 0)
+        self.assertEqual(self.store.search("%%", self.group_a)["count"], 0)
+
 if __name__ == "__main__":
     unittest.main()

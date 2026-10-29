@@ -1094,10 +1094,14 @@ class MemoryStore:
             if like_terms:
                 clauses = []
                 for term in like_terms[:8]:
-                    pattern = f"%{term}%"
+                    escaped = (str(term)
+                               .replace("\\", "\\\\")
+                               .replace("%", "\\%")
+                               .replace("_", "\\_"))
+                    pattern = f"%{escaped}%"
                     clauses.append(
-                        "(m.content LIKE ? OR coalesce(m.summary,'') LIKE ? "
-                        "OR coalesce(m.subject,'') LIKE ? OR coalesce(m.object,'') LIKE ?)"
+                        "(m.content LIKE ? ESCAPE '\\' OR coalesce(m.summary,'') LIKE ? ESCAPE '\\' "
+                        "OR coalesce(m.subject,'') LIKE ? ESCAPE '\\' OR coalesce(m.object,'') LIKE ? ESCAPE '\\')"
                     )
                     like_params.extend([pattern, pattern, pattern, pattern])
                 like_sql = " AND (" + " AND ".join(clauses) + ")"
