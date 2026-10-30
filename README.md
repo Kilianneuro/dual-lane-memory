@@ -64,6 +64,20 @@ python -m memory_core extract "我现在在玩只狼，卡在苇名弦一郎"
 python -m unittest discover -s memory_core/tests
 ```
 
+## Try the example
+
+```powershell
+python examples/quickstart.py
+```
+
+It uses an in-memory store, saves one memory, searches it, and runs one simulated
+lifecycle pass. No database, token, or network is created.
+
+## Security
+
+This is a local-first alpha. Do not expose the HTTP service to the public
+internet. See [SECURITY.md](SECURITY.md) for reporting and data-handling rules.
+
 ## Extension points
 
 The two places where a model would be plugged in are isolated behind protocols:
