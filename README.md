@@ -165,6 +165,7 @@ This project does not claim invention of decay, forgetting, or tiered memory. Re
 - [MemoryBank implementation](https://github.com/karthiknadar1204/memory-bank-paper-implementation) — Ebbinghaus-style forgetting
 - [SCM: Lifecycle Memory for Language Agents](https://zenodo.org/records/21323877) — consolidation/forgetting
 - [dual-mem](https://pypi.org/project/dual-mem/) — dual-system layered memory
+- [SurfCore](https://github.com/Mieksido/surfcore) — an integrated QQ/Bilibili/desktop companion plugin; this project is a standalone memory core, not an all-in-one companion
 
 The specific combination here is: dual-lane lifecycle + explicit/automatic promotion + scope-aware retrieval + owner approval, implemented in SQLite/FTS5 with a fail-open chat hook.
 
